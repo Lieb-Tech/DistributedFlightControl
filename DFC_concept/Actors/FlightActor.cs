@@ -12,9 +12,12 @@ namespace DFC_concept.Actors
     {
         string flightID;
         
+        // for saving to db
         IActorRef cosmosActor = null;
-        IActorRef router = null;
-        FlightSnapshotHistory snaps = new FlightSnapshotHistory();
+
+        // when flight finished tracking, store history of snaphots
+        FlightSnapshotHistory snaps;
+        // most recent update
         FlightSnapshotData currentSnapshot;
 
         protected override void PreStart()
@@ -25,35 +28,64 @@ namespace DFC_concept.Actors
             // (incase this is a crash restart)            
         }
 
-        public FlightActor(string flightID, CosmosDB cosmos)
+        public FlightActor(string flightID, CosmosDB cosmos, IActorRef icao)
         {
             this.flightID = flightID;
-            cosmosActor = Context.ActorOf(CosmosSaveActor.Props(cosmos));            
+            cosmosActor = Context.ActorOf(CosmosSaveActor.Props(cosmos));
 
+            snaps = new FlightSnapshotHistory()
+            {
+                flight = this.flightID,
+                id = "snap:" + this.flightID,
+            };
+
+            Receive<Actors.AircraftDataActor.AircraftResponse>(r =>
+            {
+                snaps.icaoAircraft = r.ICAOAircraft;
+            });
+
+            Receive<Actors.AircraftDataActor.DataResponse>(r =>
+            {
+                snaps.hex = r.Hex;
+                snaps.icaoData = r.ICAOData;
+                if (!string.IsNullOrWhiteSpace(snaps.icaoData.t))
+                    icao.Tell(new Actors.AircraftDataActor.AircraftRequest(r.ICAOData.t));               
+            });
+
+            // this is the 
             Receive<FlightRequest>(r =>
             {
-                bool isOutOrder = false;
-                if (router == null)
-                    router = Sender;
+                if (string.IsNullOrWhiteSpace(snaps.hex))
+                {
+                    icao.Tell(new Actors.AircraftDataActor.DataRequest(r.Reading.data.hex));
+                }
 
+                // ensure that current reading is newer than previous
+                // as some packets come in out of order
+                bool isOutOrder = false;
                 if (currentSnapshot != null && currentSnapshot.now > r.Reading.now)
                 {
                     Console.WriteLine("not new came in " + snaps.flight);
                     isOutOrder = true;
                 }
 
+                // create snapshot for basic web view 
                 buildSnapshot(r.Reading.now, r.Reading.data);
+
                 snaps.snapshots.Add(currentSnapshot);
-                // make sure in order
+
+                // make sure in time order
                 snaps.snapshots = snaps.snapshots.OrderBy(z => z.now).ToList();
 
+                // only update status if this is newer than previous
                 if (!isOutOrder)
                 {
-                    currentSnapshot.id = "activeSnap:" + snaps.flight;
+                    currentSnapshot.id = "activeSnap:" + this.flightID;
                     cosmosActor.Tell(new CosmosSaveRequest("flights", currentSnapshot));
-                }                
+                }
 
-                // full object archive
+                // once I get my 
+                // full object info - incase web user wants to see 
                 var ex = new FlightDataExtended(r.Reading.data)
                 {
                     altDelta = currentSnapshot.altDelta,
@@ -70,6 +102,7 @@ namespace DFC_concept.Actors
         {
             if (currentSnapshot == null)
             {
+                // create initial snapshot
                 currentSnapshot = new FlightSnapshotData()
                 {
                     now = now,
@@ -84,6 +117,7 @@ namespace DFC_concept.Actors
             }
             else
             {
+                // use previous snaphsot to get delta values
                 currentSnapshot = new FlightSnapshotData()
                 {
                     now = now,
@@ -98,10 +132,13 @@ namespace DFC_concept.Actors
             }
         }
 
-        public static Props Props(string flightId, CosmosDB cosmos) =>
-            Akka.Actor.Props.Create(() => new FlightActor(flightId, cosmos));
+        public static Props Props(string flightId, CosmosDB cosmos, IActorRef icao) =>
+            Akka.Actor.Props.Create(() => new FlightActor(flightId, cosmos, icao));
 
         #region
+        /// <summary>
+        /// Flight data ADS-B reading 
+        /// </summary>
         internal class FlightRequest
         {
             public FlightRequest(FlightReading reading)

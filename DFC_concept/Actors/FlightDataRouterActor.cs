@@ -29,6 +29,7 @@ namespace DFC_concept.Actors
         /// </summary>
         public FlightDataRouterActor()
         {
+            var icao = Context.ActorOf<Actors.AircraftDataActor>();
             var cosmos = new CosmosDB();
             Receive<DirectoryServiceActor.DirectoryLookupResponse>(r =>
             {
@@ -41,7 +42,7 @@ namespace DFC_concept.Actors
                 else if (r.ResponsibleActor == null)
                 {
                     // no reservation, so I will setup and register an actor
-                    IActorRef fa = Context.System.ActorOf(FlightActor.Props(key, cosmos), key);
+                    IActorRef fa = Context.System.ActorOf(FlightActor.Props(key, cosmos, icao), key);
                     directory.Tell(new DirectoryServiceActor.DirectoryRegisterRequest(r.Flight, fa));
                 }
                 else
@@ -86,18 +87,6 @@ namespace DFC_concept.Actors
 
         #region Messages
         /// <summary>
-        /// After Directory returns actor, start to process messages
-        /// </summary>
-        internal class ReadyToProcess
-        {            
-            public ReadyToProcess(string flight)
-            {
-                Flight = flight;
-            }
-            public string Flight { get; private set; }
-        }
-
-        /// <summary>
         /// Data from the ADS-B receiver via EventHub wrapper
         /// </summary>
         internal class DataReceiveRequest
@@ -107,16 +96,7 @@ namespace DFC_concept.Actors
                 Reading = reading;
             }
             public FlightReading Reading { get; private set; }
-        }
-
-        internal class BootstrapFlight
-        {
-            public BootstrapFlight(string flight)
-            {
-                this.Flight = flight;
-            }
-            public string Flight { get; private set; }
-        }
+        }        
         #endregion
     }
 }

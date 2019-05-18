@@ -34,6 +34,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="cosmosDbKey.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="eventHub.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

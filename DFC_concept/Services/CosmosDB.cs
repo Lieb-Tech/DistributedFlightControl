@@ -24,8 +24,7 @@ namespace DFC_concept.Services
     public class CosmosDB
     {
         private DocumentClient client;
-
-        // ADD THIS PART TO YOUR CODE
+        
         public CosmosDB()
         {
             var data = File.ReadAllText("cosmosDbKey.json");

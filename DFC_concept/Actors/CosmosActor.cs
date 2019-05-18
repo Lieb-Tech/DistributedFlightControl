@@ -14,7 +14,7 @@ namespace DFC_concept.Actors
             cdb = cosmos;
             Receive<CosmosSaveRequest>(r =>
             {
-                // cdb.UpsertDocument(r.SaveObject, r.Collection).Wait();
+                cdb.UpsertDocument(r.SaveObject, r.Collection).Wait();
             });
         }
 
