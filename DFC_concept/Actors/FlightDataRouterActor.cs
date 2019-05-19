@@ -1,6 +1,7 @@
 ﻿using Akka.Actor;
 using DFC_concept.DataStructures;
 using DFC_concept.Services;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -27,10 +28,10 @@ namespace DFC_concept.Actors
         /// <summary>
         /// responsible for managing the messages from the receiver & sending to correct actor
         /// </summary>
-        public FlightDataRouterActor()
+        public FlightDataRouterActor(IMongoDatabase mongo)
         {
-            var icao = Context.ActorOf<Actors.AircraftDataActor>();
-            var cosmos = new CosmosDB();
+            var icao = Context.ActorOf<Actors.AircraftDataActor>();                        
+
             Receive<DirectoryServiceActor.DirectoryLookupResponse>(r =>
             {
                 string key = r.Flight.Trim().ToUpper();
@@ -42,7 +43,7 @@ namespace DFC_concept.Actors
                 else if (r.ResponsibleActor == null)
                 {
                     // no reservation, so I will setup and register an actor
-                    IActorRef fa = Context.System.ActorOf(FlightActor.Props(key, cosmos, icao), key);
+                    IActorRef fa = Context.System.ActorOf(FlightActor.Props(key, mongo, icao), key);
                     directory.Tell(new DirectoryServiceActor.DirectoryRegisterRequest(r.Flight, fa));
                 }
                 else
@@ -84,6 +85,9 @@ namespace DFC_concept.Actors
                 }
             });
         }
+
+        public static Props Props(IMongoDatabase mongo) =>
+            Akka.Actor.Props.Create(() => new FlightDataRouterActor(mongo));
 
         #region Messages
         /// <summary>

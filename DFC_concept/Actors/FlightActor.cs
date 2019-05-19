@@ -1,6 +1,7 @@
 ﻿using Akka.Actor;
 using DFC_concept.DataStructures;
 using DFC_concept.Services;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +14,7 @@ namespace DFC_concept.Actors
         string flightID;
         
         // for saving to db
-        IActorRef cosmosActor = null;
+        IActorRef mongoActor = null;
 
         // when flight finished tracking, store history of snaphots
         FlightSnapshotHistory snaps;
@@ -28,10 +29,10 @@ namespace DFC_concept.Actors
             // (incase this is a crash restart)            
         }
 
-        public FlightActor(string flightID, CosmosDB cosmos, IActorRef icao)
+        public FlightActor(string flightID, IMongoDatabase mongo, IActorRef icao)
         {
             this.flightID = flightID;
-            cosmosActor = Context.ActorOf(CosmosSaveActor.Props(cosmos));
+            mongoActor = Context.ActorOf(MongoActor.Props(mongo));
 
             snaps = new FlightSnapshotHistory()
             {
@@ -81,7 +82,7 @@ namespace DFC_concept.Actors
                 if (!isOutOrder)
                 {
                     currentSnapshot.id = "activeSnap:" + this.flightID;
-                    cosmosActor.Tell(new CosmosSaveRequest("flights", currentSnapshot));
+                    mongoActor.Tell(new MongoActor.MongoSaveRequest<FlightSnapshotData>(currentSnapshot));
                 }
 
                 // once I get my 
@@ -93,7 +94,7 @@ namespace DFC_concept.Actors
                     icoaAircraft = snaps.icaoAircraft,
                     icoaData = snaps.icaoData,
                 };
-                cosmosActor.Tell(new CosmosSaveRequest("flights", ex));
+                mongoActor.Tell(new MongoActor.MongoSaveRequest<FlightDataExtended>(ex));                
             });
 
         }
@@ -132,8 +133,8 @@ namespace DFC_concept.Actors
             }
         }
 
-        public static Props Props(string flightId, CosmosDB cosmos, IActorRef icao) =>
-            Akka.Actor.Props.Create(() => new FlightActor(flightId, cosmos, icao));
+        public static Props Props(string flightId, IMongoDatabase mongo, IActorRef icao) =>
+            Akka.Actor.Props.Create(() => new FlightActor(flightId, mongo, icao));
 
         #region
         /// <summary>

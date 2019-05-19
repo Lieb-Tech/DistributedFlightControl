@@ -42,7 +42,7 @@ namespace DFC_concept.DataStructures
             base.track = flightData.track;
             base.version = flightData.version;
 
-            id = flight + ":" + (long)seen;
+            id = $"flight:{flight}:{hex}:{seen}";
         }
 
         public string id { get; set; }

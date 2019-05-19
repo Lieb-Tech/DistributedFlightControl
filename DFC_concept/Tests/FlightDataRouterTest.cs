@@ -2,6 +2,7 @@
 using Akka.TestKit;
 using Akka.TestKit.NUnit;
 using DFC_concept.Actors;
+using MongoDB.Driver;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using System;
@@ -35,10 +36,13 @@ namespace DFC_concept.Tests
         [Test]
         public void testIt()
         {
-            var dir = ActorOf<FlightDataRouterActor>("router");
+            var client = new MongoClient(Services.MongoService.ConnectionString);
+            var database = client.GetDatabase("liebfeeds");
+
+            var dir = ActorOf(FlightDataRouterActor.Props(database),"router");
 
             dir.Tell(new FlightDataRouterActor.DataReceiveRequest(packets[0]));
-            var r1 = ExpectMsg<DirectoryServiceActor.DirectoryLookupResponse>(TimeSpan.FromSeconds(60));
+            ExpectNoMsg(TimeSpan.FromSeconds(10));
         }
     }
 }
